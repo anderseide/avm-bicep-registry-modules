@@ -1427,13 +1427,19 @@ function Set-UsageExamplesSection {
     $brLink = Get-BRMRepositoryName -TemplateFilePath $TemplateFilePath
     $targetVersion = '<version>'
 
+    if ($brLink -match '^avm/') {
+        $brAlias = 'br/public'
+    } else {
+        $brAlias = 'br/private' # Shoud be posible to set using an variable.
+    }
+
     # Process content
     $SectionContent = [System.Collections.ArrayList]@(
         "The following section provides usage examples for the module, which were used to validate and deploy the module successfully. For a full reference, please review the module's test folder in its repository.",
         '',
         '>**Note**: Each example lists all the required parameters first, followed by the rest - each in alphabetical order.',
         '',
-        ('>**Note**: To reference the module, please use the following syntax `br/public:{0}:{1}`.' -f $brLink, $targetVersion),
+        ('>**Note**: To reference the module, please use the following syntax `{0}:{1}:{2}`.' -f $brAlias, $brLink, $targetVersion),
         ''
     )
 
@@ -1626,7 +1632,7 @@ function Set-UsageExamplesSection {
             if ($addBicep) {
 
                 $formattedBicepExample = @(
-                    "module $moduleNameCamelCase 'br/public:$($brLink):$($targetVersion)' = {",
+                    "module $moduleNameCamelCase '$($brAlias):$($brLink):$($targetVersion)' = {",
                     "  name: '$($moduleNameCamelCase)Deployment'"
                     '  params: {'
                 ) + $bicepExample +
@@ -1684,7 +1690,7 @@ function Set-UsageExamplesSection {
             if ($addBicepParametersFile) {
 
                 $formattedbicepParametersFileExample = @(
-                    "using 'br/public:$($brLink):$($targetVersion)'"
+                    "using '$($brAlias):$($brLink):$($targetVersion)'"
                     ''
                 ) + $bicepParametersFileExample
 
@@ -1848,7 +1854,7 @@ function Initialize-ReadMe {
     $moduleName = $TemplateFileContent.metadata.name
     $moduleDescription = $TemplateFileContent.metadata.description
 
-    if ($ReadMeFilePath -match 'avm.(?:res)') {
+    if ($ReadMeFilePath -match '[\/|\\]res[\/|\\]') {
         # Resource module
         $formattedResourceType = Get-SpecsAlignedResourceName -ResourceIdentifier $FullModuleIdentifier
 
@@ -2019,7 +2025,7 @@ function Set-ModuleReadMe {
     }
 
     $moduleRoot = Split-Path $TemplateFilePath -Parent
-    $fullModuleIdentifier = ($moduleRoot -split '[\/|\\]avm[\/|\\](res|ptn|utl)[\/|\\]')[2] -replace '\\', '/'
+    $fullModuleIdentifier = ($moduleRoot -split '[\/|\\]\w+[\/|\\](res|ptn|utl)[\/|\\]')[2] -replace '\\', '/'
     # Custom modules are modules having the same resource type but different properties based on the name
     # E.g., web/site/config--appsetting vs web/site/config--authsettingv2
     $customModuleSeparator = '--'

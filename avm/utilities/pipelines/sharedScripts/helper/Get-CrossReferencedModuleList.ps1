@@ -148,7 +148,7 @@ function Get-CrossReferencedModuleList {
         [string] $Path = (Get-Item $PSScriptRoot).Parent.Parent.Parent.Parent
     )
 
-    $repoRoot = ($Path -split '[\/|\\]avm[\/|\\](res|ptn|utl)[\/|\\]')[0]
+    $repoRoot = ($Path -split '[\/|\\]\w+[\/|\\](res|ptn|utl)[\/|\\]')[0]
     $resultSet = [ordered]@{}
 
     # Collect data
@@ -176,7 +176,7 @@ function Get-CrossReferencedModuleList {
 
         $moduleFolderPath = Split-Path $moduleTemplatePath -Parent
         ## avm/res/<provider>/<resourceType>
-        $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\]avm[\/|\\](res|ptn|utl)[\/|\\]')[2] -replace '\\', '/'
+        $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\]\w+[\/|\\](res|ptn|utl)[\/|\\]')[2] -replace '\\', '/'
 
         $providerNamespace = ($resourceTypeIdentifier -split '[\/|\\]')[0]
         $resourceType = $resourceTypeIdentifier -replace "$providerNamespace[\/|\\]", ''
