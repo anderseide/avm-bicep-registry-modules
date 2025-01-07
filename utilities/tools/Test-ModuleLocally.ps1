@@ -142,6 +142,19 @@ function Test-ModuleLocally {
         [switch] $PesterTestRecurse,
 
         [Parameter(Mandatory = $false)]
+        [switch] $PSRuleTest,
+
+        [Parameter(Mandatory = $false)]
+        [string] $PSRuleBaseline = 'Azure.Default',
+
+        [Parameter(Mandatory = $false)]
+        [ValidateSet('Pass', 'Fail', 'Error', 'None', 'Processed', 'All')]
+        [string[]] $PSRuleOutcome = @('Pass', 'Fail', 'Error'),
+
+        [Parameter(Mandatory = $false)]
+        [string] $PSRuleOutputFormat = 'Markdown',
+
+        [Parameter(Mandatory = $false)]
         [switch] $DeploymentTest,
 
         [Parameter(Mandatory = $false)]
@@ -200,6 +213,32 @@ function Test-ModuleLocally {
             } catch {
                 $PSItem.Exception.Message
             }
+        }
+
+        ################
+        # PSRule Tests #
+        ################
+
+        if ($PSRuleTest) {
+            $moduleFolderPath = Split-Path $TemplateFilePath -Parent
+            $psRuleOption = Join-Path $utilitiesFolderPath 'pipelines' 'staticValidation' 'psrule' 'ps-rule.yaml'
+            $psRulePath = Join-Path $utilitiesFolderPath 'pipelines' 'staticValidation' 'psrule' '.ps-rule'
+
+            Write-Host "Running PSRule tests for module: $moduleFolderPath/"
+            Write-Host "Using baseline: $PSRuleBaseline"
+            Write-Host "Using option file: $psRuleOption"
+            Write-Host "Using rule path: $psRulePath/"
+
+            $PSRuleConfig = @{
+                InputPath    = $moduleFolderPath + [System.IO.Path]::DirectorySeparatorChar
+                Baseline     = $PSRuleBaseline
+                Option       = $psRuleOption
+                Path         = $psRulePath + [System.IO.Path]::DirectorySeparatorChar
+                OutputFormat = $PSRuleOutputFormat
+                Outcome      = $PSRuleOutcome
+            }
+
+            Invoke-PSRule @PSRuleConfig
         }
 
         #################################
