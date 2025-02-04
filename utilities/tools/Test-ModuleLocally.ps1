@@ -220,17 +220,68 @@ function Test-ModuleLocally {
         ################
 
         if ($PSRuleTest) {
-            $moduleFolderPath = Split-Path $TemplateFilePath -Parent
+            # $moduleFolderPath = Split-Path $TemplateFilePath -Parent
             $psRuleOption = Join-Path $utilitiesFolderPath 'pipelines' 'staticValidation' 'psrule' 'ps-rule.yaml'
             $psRulePath = Join-Path $utilitiesFolderPath 'pipelines' 'staticValidation' 'psrule' '.ps-rule'
 
-            Write-Host "Running PSRule tests for module: $moduleFolderPath/"
+            Write-Host "Running PSRule tests for module: $TemplateFilePath"
             Write-Host "Using baseline: $PSRuleBaseline"
             Write-Host "Using option file: $psRuleOption"
             Write-Host "Using rule path: $psRulePath/"
 
+            # $templateFilePath = Join-Path $env:GITHUB_WORKSPACE '${{ inputs.templateFilePath }}'
+
+            # Get target files
+            $targetFileList = @(
+                $TemplateFilePath
+            )
+
+            # Add all module template files as they may contain tokens
+            $targetFileList += (Get-LocallyReferencedFileList -FilePath $TemplateFilePath)
+            $targetFileList = $targetFileList | Sort-Object -Unique
+
+            # Construct Token Function Input
+            $ConvertTokensInputs = @{
+                FilePathList = $targetFileList
+                Tokens       = @{}
+            }
+
+            # Add enforced tokens
+            $ConvertTokensInputs.Tokens += @{
+                subscriptionId    = 'subId'
+                managementGroupId = 'mgmtId'
+                tenantId          = 'tenId'
+            }
+
+            # Add local (source control) tokens
+            $tokenMap = @{}
+            foreach ($token in (Get-ChildItem env: | Where-Object -Property Name -Like 'localToken_*')) {
+                $tokenMap += @{ $token.Name.Replace('localToken_', '', 'OrdinalIgnoreCase') = $token.value }
+            }
+            Write-Verbose ('Using local tokens [{0}]' -f ($tokenMap.Keys -join ', ')) -Verbose
+            $ConvertTokensInputs.Tokens += $tokenMap
+
+            # Swap 'namePrefix' token if empty and provided as a variable
+            if ([String]::IsNullOrEmpty($ConvertTokensInputs.Tokens['namePrefix'])) {
+                Write-Verbose 'Using static [namePrefix] token' -Verbose
+                $ConvertTokensInputs.Tokens['namePrefix'] = 'psr'
+            }
+
+            Write-Verbose "Convert Tokens Input:`n $($ConvertTokensInputs | ConvertTo-Json -Depth 10)" -Verbose
+
+            # Invoke Token Replacement Functionality [For Module]
+            $null = Convert-TokensInFileList @ConvertTokensInputs
+
+            # -InputPath 'avm/res/network/application-gateway-web-application-firewall-policy/tests/e2e/defaults/main.test.bicep'
+            # -Modules 'PSRule.Rules.Azure'
+            # -Source '/utilities/pipelines/staticValidation/psrule/.ps-rule/'
+            # -Baseline 'Azure.Pillar.Reliability'
+            # -Conventions ''
+            # -Option '/home/runner/work/avm-bicep-registry-modules/avm-bicep-registry-modules//utilities/pipelines/staticValidation/psrule/ps-rule.yaml'
+
             $PSRuleConfig = @{
-                InputPath    = $moduleFolderPath + [System.IO.Path]::DirectorySeparatorChar
+                InputPath    = $TemplateFilePath
+                Module       = 'PSRule.Rules.Azure'
                 Baseline     = $PSRuleBaseline
                 Option       = $psRuleOption
                 Path         = $psRulePath + [System.IO.Path]::DirectorySeparatorChar
