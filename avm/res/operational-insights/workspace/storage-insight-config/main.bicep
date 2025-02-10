@@ -1,6 +1,5 @@
 metadata name = 'Log Analytics Workspace Storage Insight Configs'
 metadata description = 'This module deploys a Log Analytics Workspace Storage Insight Config.'
-metadata owner = 'Azure/module-maintainers'
 
 @description('Conditional. The name of the parent Log Analytics workspace. Required if the template is used in a standalone deployment.')
 param logAnalyticsWorkspaceName string
@@ -12,10 +11,10 @@ param name string = '${last(split(storageAccountResourceId, '/'))}-stinsconfig'
 param storageAccountResourceId string
 
 @description('Optional. The names of the blob containers that the workspace should read.')
-param containers array = []
+param containers string[]?
 
 @description('Optional. The names of the Azure tables that the workspace should read.')
-param tables array = []
+param tables string[]?
 
 @description('Optional. Tags to configure in the resource.')
 param tags object?

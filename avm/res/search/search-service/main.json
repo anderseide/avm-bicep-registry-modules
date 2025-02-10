@@ -5,12 +5,11 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.31.34.60546",
-      "templateHash": "18312735267946671495"
+      "version": "0.33.13.18514",
+      "templateHash": "16224557122759439562"
     },
     "name": "Search Services",
-    "description": "This module deploys a Search Service.",
-    "owner": "Azure/module-maintainers"
+    "description": "This module deploys a Search Service."
   },
   "definitions": {
     "secretsExportConfigurationType": {
@@ -1794,12 +1793,11 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.31.34.60546",
-              "templateHash": "13697564567147510981"
+              "version": "0.33.13.18514",
+              "templateHash": "13664767556137402121"
             },
             "name": "Search Services Private Link Resources",
-            "description": "This module deploys a Search Service Private Link Resource.",
-            "owner": "Azure/module-maintainers"
+            "description": "This module deploys a Search Service Private Link Resource."
           },
           "parameters": {
             "searchServiceName": {
@@ -1915,8 +1913,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.31.34.60546",
-              "templateHash": "251825345610643647"
+              "version": "0.33.13.18514",
+              "templateHash": "5455406267618725608"
             }
           },
           "definitions": {
@@ -2044,10 +2042,11 @@
     },
     "systemAssignedMIPrincipalId": {
       "type": "string",
+      "nullable": true,
       "metadata": {
         "description": "The principal ID of the system assigned identity."
       },
-      "value": "[coalesce(tryGet(tryGet(reference('searchService', '2024-03-01-preview', 'full'), 'identity'), 'principalId'), '')]"
+      "value": "[tryGet(tryGet(reference('searchService', '2024-03-01-preview', 'full'), 'identity'), 'principalId')]"
     },
     "location": {
       "type": "string",

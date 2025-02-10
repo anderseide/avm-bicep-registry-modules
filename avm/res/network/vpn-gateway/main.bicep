@@ -1,6 +1,5 @@
 metadata name = 'VPN Gateways'
 metadata description = 'This module deploys a VPN Gateway.'
-metadata owner = 'Azure/module-maintainers'
 
 @description('Required. Name of the VPN gateway.')
 param name string
@@ -143,6 +142,7 @@ module vpnGateway_vpnConnections 'vpn-connection/main.bicep' = [
       useLocalAzureIpAddress: connection.?useLocalAzureIpAddress
       usePolicyBasedTrafficSelectors: connection.?usePolicyBasedTrafficSelectors
       vpnConnectionProtocolType: connection.?vpnConnectionProtocolType
+      ipsecPolicies: connection.?ipsecPolicies
       trafficSelectorPolicies: connection.?trafficSelectorPolicies
       vpnLinkConnections: connection.?vpnLinkConnections
     }
