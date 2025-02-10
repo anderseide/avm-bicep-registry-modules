@@ -63,7 +63,7 @@ Describe 'File/folder tests' -Tag 'Modules' {
         BeforeDiscovery {
             $moduleFolderTestCases = [System.Collections.ArrayList] @()
             foreach ($moduleFolderPath in $moduleFolderPaths) {
-                $null, $moduleType, $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\]avm[\/|\\](res|ptn|utl)[\/|\\]') # 'avm/res|ptn|utl/<provider>/<resourceType>' would return 'avm', 'res|ptn|utl', '<provider>/<resourceType>'
+                $null, $moduleBaseFolder, $moduleType, $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\](\w+)[\/|\\](res|ptn|utl)[\/|\\]')
                 $resourceTypeIdentifier = $resourceTypeIdentifier -replace '\\', '/'
                 $moduleFolderTestCases += @{
                     moduleFolderName = $resourceTypeIdentifier
@@ -136,8 +136,14 @@ Describe 'File/folder tests' -Tag 'Modules' {
 
             param(
                 [string] $moduleFolderPath,
-                [string] $moduleType
+                [string] $moduleType,
+                [string] $moduleBaseFolder
             )
+
+            if ($moduleFolderPath -match 'pavm') {
+                Set-ItResult -Skipped -Because 'This is a private AVM Module. Skipping test.'
+                return
+            }
 
             $templateFilePath = Join-Path -Path $moduleFolderPath 'main.bicep'
 
@@ -188,11 +194,13 @@ Describe 'File/folder tests' -Tag 'Modules' {
         BeforeDiscovery {
             $topLevelModuleTestCases = [System.Collections.ArrayList]@()
             foreach ($moduleFolderPath in $moduleFolderPaths) {
-                $null, $moduleType, $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\]avm[\/|\\](res|ptn|utl)[\/|\\]') # 'avm/res|ptn|utl/<provider>/<resourceType>' would return 'avm', 'res|ptn|utl', '<provider>/<resourceType>'
-                $resourceTypeIdentifier = $resourceTypeIdentifier -replace '\\', '/'
+
+                $null, $moduleBaseFolder, $moduleType, $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\](\w+)[\/|\\](res|ptn|utl)[\/|\\]')
+                $relativeModulePath = Join-Path $moduleBaseFolder $moduleType $resourceTypeIdentifier
+
                 if (($resourceTypeIdentifier -split '[\/|\\]').Count -eq 2) {
                     $topLevelModuleTestCases += @{
-                        moduleFolderName = $moduleFolderPath.Replace('\', '/').Split('/avm/')[1]
+                        moduleFolderName = $relativeModulePath
                         moduleFolderPath = $moduleFolderPath
                         moduleType       = $moduleType
                     }
@@ -279,8 +287,8 @@ Describe 'Pipeline tests' -Tag 'Pipeline' {
         $pipelineTestCases = [System.Collections.ArrayList] @()
         foreach ($moduleFolderPath in $moduleFolderPaths) {
 
-            $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\]avm[\/|\\](res|ptn|utl)[\/|\\]')[2] -replace '\\', '/' # 'avm/res|ptn|utl/<provider>/<resourceType>' would return '<provider>/<resourceType>'
-            $relativeModulePath = Join-Path 'avm' ($moduleFolderPath -split '[\/|\\]avm[\/|\\]')[1]
+            $null, $moduleBaseFolder, $moduleType, $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\](\w+)[\/|\\](res|ptn|utl)[\/|\\]')
+            $relativeModulePath = Join-Path $moduleBaseFolder $moduleType $resourceTypeIdentifier
 
             $isTopLevelModule = ($resourceTypeIdentifier -split '[\/|\\]').Count -eq 2
             if ($isTopLevelModule) {
@@ -336,7 +344,7 @@ Describe 'Module tests' -Tag 'Module' {
 
             foreach ($moduleFolderPath in $moduleFolderPaths) {
 
-                $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\]avm[\/|\\](res|ptn|utl)[\/|\\]')[2] -replace '\\', '/' # 'avm/res|ptn|utl/<provider>/<resourceType>' would return '<provider>/<resourceType>'
+                $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\]\w+[\/|\\](res|ptn|utl)[\/|\\]')[2] -replace '\\', '/'
                 $templateFilePath = Join-Path $moduleFolderPath 'main.bicep'
 
                 $readmeFileTestCases += @{
@@ -421,7 +429,7 @@ Describe 'Module tests' -Tag 'Module' {
                     continue
                 }
 
-                $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\]avm[\/|\\](res|ptn|utl)[\/|\\]')[2] -replace '\\', '/' # 'avm/res|ptn|utl/<provider>/<resourceType>' would return '<provider>/<resourceType>'
+                $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\]\w+[\/|\\](res|ptn|utl)[\/|\\]')[2] -replace '\\', '/'
 
                 $armTemplateTestCases += @{
                     moduleFolderName = $resourceTypeIdentifier
@@ -475,12 +483,13 @@ Describe 'Module tests' -Tag 'Module' {
                 $templateFilePath = Join-Path $moduleFolderPath 'main.bicep'
                 $templateFileContent = $builtTestFileMap[$templateFilePath]
 
-                $null, $moduleType, $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\]avm[\/|\\](res|ptn|utl)[\/|\\]') # 'avm/res|ptn|utl/<provider>/<resourceType>' would return 'avm', 'res|ptn|utl', '<provider>/<resourceType>'
+                $null, $moduleRootFolder, $moduleType, $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\](\w+)[\/|\\](res|ptn|utl)[\/|\\]')
                 $resourceTypeIdentifier = $resourceTypeIdentifier -replace '\\', '/'
 
                 # Test file setup
                 $moduleFolderTestCases += @{
                     moduleFolderName       = $resourceTypeIdentifier
+                    moduleRootFolder       = $moduleRootFolder
                     templateFileContent    = $templateFileContent
                     templateFilePath       = $templateFilePath
                     templateFileParameters = Resolve-ReadMeParameterList -TemplateFileContent $templateFileContent
@@ -724,18 +733,19 @@ Describe 'Module tests' -Tag 'Module' {
                     $udtSpecificTestCases = [System.Collections.ArrayList] @() # Specific UDT test cases for singular UDTs (e.g. tags)
                     foreach ($moduleFolderPath in $moduleFolderPaths) {
 
-                        if ($moduleFolderPath -match '[\/|\\]avm[\/|\\](ptn|utl)[\/|\\]') {
+                        if ($moduleFolderPath -match '[\/|\\]\w+[\/|\\](ptn|utl)[\/|\\]') {
                             # Skip UDT interface tests for ptn & utl modules
                             continue
                         }
 
-                        $null, $moduleType, $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\]avm[\/|\\](res|ptn|utl)[\/|\\]') # 'avm/res|ptn|utl/<provider>/<resourceType>' would return 'avm', 'res|ptn|utl', '<provider>/<resourceType>'
+                        $null, $moduleRootFolder, $moduleType, $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\](\w+)[\/|\\](res|ptn|utl)[\/|\\]')
                         $resourceTypeIdentifier = $resourceTypeIdentifier -replace '\\', '/'
                         $templateFilePath = Join-Path $moduleFolderPath 'main.bicep'
                         $templateFileContent = $builtTestFileMap[$templateFilePath]
 
                         $udtSpecificTestCases += @{
                             moduleFolderName         = $resourceTypeIdentifier
+                            moduleRootFolder         = $moduleRootFolder
                             templateFileContent      = $templateFileContent
                             templateFileContentBicep = Get-Content $templateFilePath
                             moduleType               = $moduleType
@@ -936,8 +946,14 @@ Describe 'Module tests' -Tag 'Module' {
                 param(
                     [string] $templateFilePath,
                     [string] $moduleType,
-                    [hashtable] $templateFileContent
+                    [hashtable] $templateFileContent,
+                    [string] $moduleFolderName
                 )
+
+                if ($moduleFolderName -ne 'avm') {
+                    Set-ItResult -Skipped -Because 'Telemetry is only required in the AVM module'
+                    return
+                }
 
                 # With the introduction of user defined types, the way resources are configured in the schema slightly changed. We have to account for that.
                 if ($templateFileContent.resources.GetType().Name -eq 'Object[]') {
@@ -1041,12 +1057,14 @@ Describe 'Module tests' -Tag 'Module' {
 
                 param(
                     [hashtable] $templateFileContent,
-                    [string] $templateFilePath
+                    [string] $templateFilePath,
+                    [string] $moduleType,
+                    [string] $moduleFolderName
                 )
 
                 $outputs = $templateFileContent.outputs
 
-                $primaryResourceType = (Split-Path $TemplateFilePath -Parent).Replace('\', '/').split('/avm/')[1]
+                $primaryResourceType = "$moduleType/$moduleFolderName"
                 $primaryResourceTypeResource = $templateFileContent.resources | Where-Object { $_.type -eq $primaryResourceType }
 
                 if ($primaryResourceTypeResource.keys -contains 'location' -and $primaryResourceTypeResource.location -ne 'global') {
@@ -1276,15 +1294,15 @@ Describe 'Governance tests' {
         $governanceTestCases = [System.Collections.ArrayList] @()
         foreach ($moduleFolderPath in $moduleFolderPaths) {
 
-            $null, $moduleType, $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\]avm[\/|\\](res|ptn|utl)[\/|\\]') # 'avm/res|ptn|utl/<provider>/<resourceType>' would return 'avm', 'res|ptn|utl', '<provider>/<resourceType>'
-            $resourceTypeIdentifier = $resourceTypeIdentifier -replace '\\', '/'
-            $relativeModulePath = Join-Path 'avm' ($moduleFolderPath -split '[\/|\\]avm[\/|\\]')[1]
+            $null, $moduleBaseFolder, $moduleType, $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\](\w+)[\/|\\](res|ptn|utl)[\/|\\]')
+            $relativeModulePath = Join-Path $moduleBaseFolder $moduleType $resourceTypeIdentifier
 
             $isTopLevelModule = ($resourceTypeIdentifier -split '[\/|\\]').Count -eq 2
             if ($isTopLevelModule) {
 
                 $governanceTestCases += @{
                     relativeModulePath = $relativeModulePath
+                    moduleBaseFolder   = $moduleBaseFolder
                     repoRootPath       = $repoRootPath
                     moduleFolderName   = $resourceTypeIdentifier
                     moduleType         = $moduleType
@@ -1297,8 +1315,14 @@ Describe 'Governance tests' {
 
         param(
             [string] $relativeModulePath,
-            [string] $repoRootPath
+            [string] $repoRootPath,
+            [string] $moduleBaseFolder
         )
+
+        if ($moduleBaseFolder -ne 'avm') {
+            Set-ItResult -Skipped -Because 'only AVM modules require a CODEOWNERS file record.'
+            return
+        }
 
         $codeownersFilePath = Join-Path $repoRootPath '.github' 'CODEOWNERS'
         $codeOwnersContent = Get-Content $codeownersFilePath
@@ -1319,8 +1343,14 @@ Describe 'Governance tests' {
 
         param(
             [string] $relativeModulePath,
-            [string] $repoRootPath
+            [string] $repoRootPath,
+            [string] $moduleBaseFolder
         )
+
+        if ($moduleBaseFolder -ne 'avm') {
+            Set-ItResult -Skipped -Because 'only AVM modules require a avm_module_issue record.'
+            return
+        }
 
         $issueTemplatePath = Join-Path $repoRootPath '.github' 'ISSUE_TEMPLATE' 'avm_module_issue.yml'
         $issueTemplateContent = Get-Content $issueTemplatePath
@@ -1371,7 +1401,7 @@ Describe 'Test file tests' -Tag 'TestTemplate' {
                     $testFilePaths = (Get-ChildItem -Path $moduleFolderPath -Recurse -Filter 'main.test.bicep').FullName | Sort-Object -Culture 'en-US'
                     foreach ($testFilePath in $testFilePaths) {
                         $testFileContent = Get-Content $testFilePath
-                        $null, $moduleType, $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\]avm[\/|\\](res|ptn|utl)[\/|\\]') # 'avm/res|ptn|utl/<provider>/<resourceType>' would return 'avm', 'res|ptn|utl', '<provider>/<resourceType>'
+                        $null, $moduleType, $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\]\w+[\/|\\](res|ptn|utl)[\/|\\]') # 'avm/res|ptn|utl/<provider>/<resourceType>' would return 'avm', 'res|ptn|utl', '<provider>/<resourceType>'
                         $resourceTypeIdentifier = $resourceTypeIdentifier -replace '\\', '/'
 
                         $deploymentTestFileTestCases += @{
@@ -1525,7 +1555,9 @@ Describe 'API version tests' -Tag 'ApiCheck' {
 
         foreach ($moduleFolderPath in $moduleFolderPaths) {
 
-            $moduleFolderName = $moduleFolderPath.Replace('\', '/').Split('/avm/')[1]
+            $null, $moduleBaseFolder, $moduleType, $resourceTypeIdentifier = ($moduleFolderPath -split '[\/|\\](\w+)[\/|\\](res|ptn|utl)[\/|\\]')
+            $moduleFolderName = Join-Path $moduleBaseFolder $moduleType $resourceTypeIdentifier
+
             $templateFilePath = Join-Path $moduleFolderPath 'main.bicep'
             $templateFileContent = $builtTestFileMap[$templateFilePath]
 
