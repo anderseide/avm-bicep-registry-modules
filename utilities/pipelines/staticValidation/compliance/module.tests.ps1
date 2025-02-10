@@ -1672,17 +1672,3 @@ Describe 'API version tests' -Tag 'ApiCheck' {
         }
     }
 }
-
-if ($indexOfVersion -gt ($approvedApiVersions.Count - 2)) {
-    $newerAPIVersions = $approvedApiVersions[0..($indexOfVersion - 1)]
-
-    $warningMessage = "The used API version [$TargetApi] for Resource Type [$ProviderNamespace/$ResourceType] will soon expire. Please consider updating it. Consider using one of the newer API versions [{0}]" -f ($newerAPIVersions -join ', ')
-    Write-Warning $warningMessage
-
-    Write-Output @{
-        Warning = $warningMessage
-    }
-}
-}
-}
-}
