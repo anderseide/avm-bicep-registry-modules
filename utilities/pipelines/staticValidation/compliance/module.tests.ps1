@@ -70,6 +70,7 @@ Describe 'File/folder tests' -Tag 'Modules' {
                     moduleFolderPath = $moduleFolderPath
                     isTopLevelModule = ($resourceTypeIdentifier -split '[\/|\\]').Count -eq 2
                     moduleType       = $moduleType
+                    moduleBaseFolder = $moduleBaseFolder
                 }
             }
         }
@@ -140,8 +141,8 @@ Describe 'File/folder tests' -Tag 'Modules' {
                 [string] $moduleBaseFolder
             )
 
-            if ($moduleFolderPath -ne 'avm') {
-                Set-ItResult -Skipped -Because 'This is a private AVM Module. Skipping test.'
+            if ($moduleBaseFolder -ne 'avm') {
+                Set-ItResult -Skipped -Because 'this is a private AVM Module.'
                 return
             }
 
