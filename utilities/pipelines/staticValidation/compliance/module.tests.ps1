@@ -140,7 +140,7 @@ Describe 'File/folder tests' -Tag 'Modules' {
                 [string] $moduleBaseFolder
             )
 
-            if ($moduleFolderPath -match 'pavm') {
+            if ($moduleFolderPath -ne 'avm') {
                 Set-ItResult -Skipped -Because 'This is a private AVM Module. Skipping test.'
                 return
             }
