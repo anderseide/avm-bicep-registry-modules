@@ -50,14 +50,13 @@ function Publish-AVMModuleFromTag {
         $null, $moduleName, $moduleVersion = ($GitTagName -split '(.+)[\/](\d+.\d+.\d+)')
 
         $moduleMainFilePath = Join-Path $moduleName 'main.bicep'
-
-        Write-Host "Relative Module Path: $moduleMainFilePath"
-        Write-Host "Module Name: $moduleName"
-        Write-Host "Module version: $moduleVersion[0]"
-        Write-Host "Bicep Module Registry Server: $BicepModuleRegistryServer"
-
         $target = 'br:{0}/{1}/{2}:{3}' -f $BicepModuleRegistryServer, $BicepModuleRegistryRootPath, $moduleName, $moduleVersion[0]
-        Write-Host "publishing to $target"
+
+        Write-Verbose "Relative Module Path: $moduleMainFilePath"
+        Write-Verbose "Module Name: $moduleName"
+        Write-Verbose "Module version: $moduleVersion[0]"
+        Write-Verbose "Bicep Module Registry Server: $BicepModuleRegistryServer"
+        Write-Verbose "publishing to $target"
 
         # Checkout tag
         $originalBranch = git rev-parse --abbrev-ref HEAD
