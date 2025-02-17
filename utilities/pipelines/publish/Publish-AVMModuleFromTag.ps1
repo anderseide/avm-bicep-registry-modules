@@ -54,7 +54,7 @@ function Publish-AVMModuleFromTag {
 
         Write-Verbose "Relative Module Path: $moduleMainFilePath"
         Write-Verbose "Module Name: $moduleName"
-        Write-Verbose "Module version: $moduleVersion[0]"
+        Write-Verbose "Module version: $moduleVersion"
         Write-Verbose "Bicep Module Registry Server: $BicepModuleRegistryServer"
         Write-Verbose "publishing to $target"
 
