@@ -28,7 +28,7 @@ function Publish-AVMModuleFromTag {
         [string] $BicepModuleRegistryServer,
 
         [Parameter(Mandatory = $false)]
-        [string] $BicepModuleRegistryRootPath = 'public/avm'
+        [string] $BicepModuleRegistryRootPath = 'public/bicep'
 
     )
 
