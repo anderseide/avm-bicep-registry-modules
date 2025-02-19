@@ -12,6 +12,9 @@ Mandatory. The path to the deployment file
 .PARAMETER BicepModuleRegistryServer
 Mandatory. The public registry server.
 
+.PARAMETER BicepModuleRegistryRootPath
+Optional. The root path to the module in the registry. Default is 'public/avm'.
+
 .EXAMPLE
 Publish-AVMModuleFromTag -GitTagName 'avm/res/storage/storage-account/0.17.3' -BicepModuleRegistryServer 'myServer' -BicepModuleRegistryRootPath 'public/avm'
 #>
@@ -63,10 +66,45 @@ function Publish-AVMModuleFromTag {
 
         git checkout $GitTagName
 
+        # update bicepconfig.json to override br/public
+
+        $bicepConfigPath = 'bicepconfig.json'
+
+        $bicepConfigRaw = Get-Content $bicepConfigPath
+        $bicepConfig = $bicepConfigRaw | Where-Object { -not $_.StartsWith('//') }
+
+        $bicepConfig = $bicepConfig | ConvertFrom-Json -AsHashtable
+
+
+        Write-Host 'Testing if public exists in bicepConfig'
+        if ($bicepConfig.ContainsKey('moduleAliases') -eq $false) {
+            Write-Host 'Adding moduleAliases to bicepConfig'
+            $bicepConfig.Add('moduleAliases', @{})
+        }
+
+        if ($bicepConfig.moduleAliases.ContainsKey('br') -eq $false) {
+            Write-Host 'Adding br to bicepConfig'
+            $bicepConfig.moduleAliases.Add('br', @{})
+        }
+
+        if ($bicepConfig.moduleAliases.br.ContainsKey('public')) {
+            Write-Host 'Updating public in bicepConfig'
+            $bicepConfig.moduleAliases.br.public.registry = $BicepModuleRegistryServer
+            $bicepConfig.moduleAliases.br.public.modulePath = $BicepModuleRegistryRootPath
+        } else {
+            Write-Host 'Adding public to bicepConfig'
+            $bicepConfig.moduleAliases.br.Add('public', @{
+                    registry   = $BicepModuleRegistryServer
+                    modulePath = $BicepModuleRegistryRootPath
+                })
+        }
+
+        $bicepConfig | ConvertTo-Json -Depth 10 | Set-Content $bicepConfigPath
+
+        Write-Host "Publishing $moduleMainFilePath to $target"
         Publish-AzBicepModule -FilePath $moduleMainFilePath -Target $target
 
         git checkout $originalBranch
-
 
     }
 
