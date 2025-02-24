@@ -592,8 +592,14 @@ Describe 'Module tests' -Tag 'Module' {
             It '[<moduleFolderName>] The telemetry parameter should be present & have the expected type, default value & metadata description.' -TestCases ($moduleFolderTestCases | Where-Object { $_.isTopLevelModule -and $_.templateFileContent.resources.count -gt 0 }) {
 
                 param(
-                    [hashtable] $templateFileParameters
+                    [hashtable] $templateFileParameters,
+                    [string] $moduleRootName
                 )
+
+                if ($moduleRootName -ne 'avm') {
+                    Set-ItResult -Skipped -Because 'this is a private AVM Module.'
+                    return
+                }
 
                 $templateFileParameters.PSBase.Keys | Should -Contain 'enableTelemetry'
                 $templateFileParameters.enableTelemetry.type | Should -Be 'bool'
@@ -881,8 +887,14 @@ Describe 'Module tests' -Tag 'Module' {
             It '[<moduleFolderName>] Telemetry deployment should be present in the template.' -TestCases ($moduleFolderTestCases | Where-Object { $_.isTopLevelModule -and $_.templateFileContent.resources.count -gt 0 }) {
 
                 param(
-                    [hashtable] $templateFileContent
+                    [hashtable] $templateFileContent,
+                    [string] $moduleRootFolder
                 )
+
+                if ($moduleRootFolder -ne 'avm') {
+                    Set-ItResult -Skipped -Because 'Telemetry is only required in the AVM module'
+                    return
+                }
 
                 # With the introduction of user defined types, the way resources are configured in the schema slightly changed. We have to account for that.
                 if ($templateFileContent.resources.GetType().Name -eq 'Object[]') {
