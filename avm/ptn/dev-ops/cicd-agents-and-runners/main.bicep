@@ -26,6 +26,9 @@ param privateNetworking bool = true
 @description('Optional. Enable/Disable usage telemetry for module.')
 param enableTelemetry bool = true
 
+@description('Optional. Existing Log Analytics workspace resource Id to be used for telemetry.')
+param logAnalyticsWorkspaceResourceId string = ''
+
 // ================ //
 // Variables        //
 // ================ //
@@ -204,7 +207,7 @@ resource avmTelemetry 'Microsoft.Resources/deployments@2023-07-01' = if (enableT
   }
 }
 
-module logAnalyticsWokrspace 'br/public:avm/res/operational-insights/workspace:0.5.0' = {
+module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0.5.0' = if (empty(logAnalyticsWorkspaceResourceId)) {
   name: 'logAnalyticsWokrspace'
   params: {
     name: 'law-${namingPrefix}-${uniqueString(resourceGroup().id)}-law'
@@ -351,6 +354,7 @@ module newVnet 'br/public:avm/res/network/virtual-network:0.2.0' = if (networkin
     )
   }
 }
+
 module appEnvironment 'br/public:avm/res/app/managed-environment:0.6.2' = if (contains(
   computeTypes,
   'azure-container-app'
@@ -358,7 +362,10 @@ module appEnvironment 'br/public:avm/res/app/managed-environment:0.6.2' = if (co
   name: 'appEnv-${uniqueString(resourceGroup().id)}'
   params: {
     name: 'appEnv${namingPrefix}${uniqueString(resourceGroup().id)}'
-    logAnalyticsWorkspaceResourceId: logAnalyticsWokrspace.outputs.resourceId
+    // logAnalyticsWorkspaceResourceId: logAnalyticsWokrspace.outputs.resourceId
+    logAnalyticsWorkspaceResourceId: empty(logAnalyticsWorkspaceResourceId)
+      ? logAnalyticsWorkspace.outputs.resourceId
+      : logAnalyticsWorkspaceResourceId
     location: location
     infrastructureSubnetId: networkingConfiguration.networkType == 'createNew'
       ? filter(

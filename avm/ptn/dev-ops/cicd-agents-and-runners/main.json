@@ -5,8 +5,8 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.32.4.45862",
-      "templateHash": "5382537109905181094"
+      "version": "0.33.93.31351",
+      "templateHash": "10812403596735280950"
     },
     "name": "CI CD Agents and Runners",
     "description": "This module deploys self-hosted agents and runners for Azure DevOps and GitHub on Azure Container Instances and/or Azure Container Apps."
@@ -671,6 +671,13 @@
       "metadata": {
         "description": "Optional. Enable/Disable usage telemetry for module."
       }
+    },
+    "logAnalyticsWorkspaceResourceId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional. Existing Log Analytics workspace resource Id to be used for telemetry."
+      }
     }
   },
   "variables": {
@@ -775,7 +782,8 @@
         "buildImagesRoleAssignment"
       ]
     },
-    "logAnalyticsWokrspace": {
+    "logAnalyticsWorkspace": {
+      "condition": "[empty(parameters('logAnalyticsWorkspaceResourceId'))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "logAnalyticsWokrspace",
@@ -10080,9 +10088,7 @@
           "name": {
             "value": "[format('appEnv{0}{1}', parameters('namingPrefix'), uniqueString(resourceGroup().id))]"
           },
-          "logAnalyticsWorkspaceResourceId": {
-            "value": "[reference('logAnalyticsWokrspace').outputs.resourceId.value]"
-          },
+          "logAnalyticsWorkspaceResourceId": "[if(empty(parameters('logAnalyticsWorkspaceResourceId')), createObject('value', reference('logAnalyticsWorkspace').outputs.resourceId.value), createObject('value', parameters('logAnalyticsWorkspaceResourceId')))]",
           "location": {
             "value": "[parameters('location')]"
           },
@@ -10645,7 +10651,7 @@
         }
       },
       "dependsOn": [
-        "logAnalyticsWokrspace",
+        "logAnalyticsWorkspace",
         "newVnet"
       ]
     },
