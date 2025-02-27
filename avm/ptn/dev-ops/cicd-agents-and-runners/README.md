@@ -1504,7 +1504,7 @@ This section gives you an overview of all local-referenced module files (i.e., o
 | Reference | Type |
 | :-- | :-- |
 | `br/public:avm/ptn/authorization/resource-role-assignment:0.1.1` | Remote reference |
-| `br/public:avm/res/app/job:0.4.0` | Remote reference |
+| `br/public:avm/res/app/job:0.6.0` | Remote reference |
 | `br/public:avm/res/app/managed-environment:0.6.2` | Remote reference |
 | `br/public:avm/res/container-instance/container-group:0.2.0` | Remote reference |
 | `br/public:avm/res/container-registry/registry:0.4.0` | Remote reference |
