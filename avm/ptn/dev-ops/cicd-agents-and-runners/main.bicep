@@ -222,7 +222,7 @@ module userAssignedIdentity 'br/public:avm/res/managed-identity/user-assigned-id
   }
 }
 
-module acrPrivateDNSZone 'br/public:avm/res/network/private-dns-zone:0.5.0' = if (privateNetworking && empty(networkingConfiguration.?containerRegistryPrivateDnsZoneResourceId ?? '')) {
+module acrPrivateDNSZone 'br/public:avm/res/network/private-dns-zone:0.5.0' = if (privateNetworking && empty(networkingConfiguration.?containerRegistryPrivateDnsZoneResourceId ?? '') && networkingConfiguration.?skipPrivateDnsZones != true) {
   name: 'acrdnszone${namingPrefix}${uniqueString(resourceGroup().id)}'
   params: {
     name: 'privatelink.azurecr.io'
@@ -723,7 +723,7 @@ module acaPlaceholderJob 'br/public:avm/res/app/job:0.6.0' = if (contains(comput
 module deploymentScriptPrivateDNSZone 'br/public:avm/res/network/private-dns-zone:0.5.0' = if (contains(
   computeTypes,
   'azure-container-app'
-) && selfHostedConfig.selfHostedType == 'azuredevops' && privateNetworking && empty(networkingConfiguration.computeNetworking.?deploymentScriptPrivateDnsZoneResourceId ?? '')) {
+) && selfHostedConfig.selfHostedType == 'azuredevops' && privateNetworking && empty(networkingConfiguration.?computeNetworking.?deploymentScriptPrivateDnsZoneResourceId ?? '') && networkingConfiguration.?skipPrivateDnsZones != true) {
   name: 'stgdsdnszone${namingPrefix}${uniqueString(resourceGroup().id)}'
   params: {
     name: 'privatelink.file.${environment().suffixes.storage}'
@@ -760,7 +760,7 @@ module deploymentScriptStg 'br/public:avm/res/storage/storage-account:0.13.0' = 
       {
         service: 'file'
         subnetResourceId: networkingConfiguration.networkType == 'useExisting'
-          ? '${networkingConfiguration.virtualNetworkResourceId}/subnets/${networkingConfiguration.computeNetworking.containerAppDeploymentScriptSubnetName}'
+          ? '${networkingConfiguration.virtualNetworkResourceId}/subnets/${networkingConfiguration.?computeNetworking.?containerAppDeploymentScriptSubnetName}'
           : filter(
               newVnet.outputs.subnetResourceIds,
               subnetId =>
@@ -769,10 +769,12 @@ module deploymentScriptStg 'br/public:avm/res/storage/storage-account:0.13.0' = 
                   networkingConfiguration.?containerAppDeploymentScriptSubnetName ?? 'snet-ada-deployment-script'
                 )
             )[0]
-        privateDnsZoneGroupName: 'stgPrivateDNSZoneGroup'
-        privateDnsZoneResourceIds: [
-          networkingConfiguration.computeNetworking.?deploymentScriptPrivateDnsZoneResourceId ?? deploymentScriptPrivateDNSZone.outputs.resourceId
-        ]
+        privateDnsZoneGroupName: networkingConfiguration.?skipPrivateDnsZones != true ? 'stgPrivateDNSZoneGroup' : null
+        privateDnsZoneResourceIds: networkingConfiguration.?skipPrivateDnsZones != true
+          ? [
+              networkingConfiguration.?computeNetworking.?deploymentScriptPrivateDnsZoneResourceId ?? deploymentScriptPrivateDNSZone.outputs.resourceId
+            ]
+          : null
       }
     ]
   }
@@ -876,6 +878,9 @@ type newNetworkType = {
 
   @description('Optional. The deployment script private DNS zone Id. If not provided, a new private DNS zone will be created. Only required if private networking is used.')
   deploymentScriptPrivateDnsZoneResourceId: string?
+
+  @description('Optional. Should not deploy private DNS zones if existing resource IDs is missing in networkConfiguration')
+  skipPrivateDnsZones: bool?
 }
 
 @export()
@@ -900,6 +905,9 @@ type existingNetworkType = {
 
   @description('Required. The compute type networking type.')
   computeNetworking: computeNetworkingType
+
+  @description('Optional. Should not deploy private DNS zones if existing resource IDs is missing in networkConfiguration')
+  skipPrivateDnsZones: bool?
 }
 
 @export()
@@ -918,6 +926,9 @@ type containerAppNetworkConfigType = {
 
   @description('Required. The container instance subnet name in the created virtual network. If not provided, a default name will be used. This subnet is required for private networking Azure DevOps scenarios to deploy the deployment script which starts the placeholder agent privately.')
   containerInstanceSubnetName: string?
+
+  @description('Optional. Should not deploy private DNS zones if existing resource IDs is missing in networkConfiguration')
+  skipPrivateDnsZones: bool?
 }
 
 type containerInstanceNetworkConfigType = {
@@ -926,6 +937,9 @@ type containerInstanceNetworkConfigType = {
 
   @description('Required. The container instance subnet name in the created virtual network. If not provided, a default name will be used.')
   containerInstanceSubnetName: string
+
+  @description('Optional. Should not deploy private DNS zones if existing resource IDs is missing in networkConfiguration')
+  skipPrivateDnsZones: bool?
 }
 
 @export()
