@@ -1,7 +1,7 @@
 targetScope = 'subscription'
 
-metadata name = 'Defaults Azure DevOps self-hosted agents using both Azure Container Instances and Azure Container Apps with existing log workspace.'
-metadata description = 'This instance deploys the module with the minimum set of required parameters for Azure DevOps self-hosted agents in Azure Container Instances and Azure Container Apps, and uses an existing log workspace.'
+metadata name = 'CICD Agents and Runnes with existing dependencies like Log Analytics Workspace and Azure Container Registry and DNS configuration for the virtual network'
+metadata description = 'This test will deploy the CICD Agents and Runners module with Azure Container Instances and Container Apps and it will use existing dependencies for Log Analytics Workspace, Azure Container Registry and DNS.'
 
 // ========== //
 // Parameters //
@@ -19,7 +19,7 @@ var enforcedLocation = 'eastus2'
 param personalAccessToken string = newGuid()
 
 @description('Optional. A short identifier for the kind of deployment. Should be kept short to not run into resource-name length-constraints.')
-param serviceShort string = 'acaacil'
+param serviceShort string = 'acaacie'
 
 @description('Optional. A token to inject into the name of each resource.')
 param namePrefix string = '#_namePrefix_#'
@@ -28,7 +28,7 @@ param namePrefix string = '#_namePrefix_#'
 // General resources
 // =================
 
-resource resourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
+resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-11-01' = {
   name: resourceGroupName
   location: enforcedLocation
 }
@@ -68,7 +68,11 @@ module testDeployment '../../../main.bicep' = {
       addressSpace: '10.0.0.0/16'
       networkType: 'createNew'
       virtualNetworkName: 'vnet-aca'
+      deploymentScriptPrivateDnsZoneResourceId: nestedDependencies.outputs.privateDnsFileStorageResourceId
+      containerRegistryPrivateDnsZoneResourceId: nestedDependencies.outputs.acrPrivateDNSZoneResourceId
+      addPrivateDnsZoneVirtualNetworkLink: true
     }
-    privateNetworking: false
+    privateNetworking: true
+    logAnalyticsWorkspaceResourceId: nestedDependencies.outputs.logAnalyticsWorkspaceResourceId
   }
 }

@@ -27,7 +27,7 @@ param privateNetworking bool = true
 param enableTelemetry bool = true
 
 @description('Optional. Existing Log Analytics workspace resource Id to be used for telemetry.')
-param logAnalyticsWorkspaceResourceId string = ''
+param logAnalyticsWorkspaceResourceId string?
 
 // ================ //
 // Variables        //
@@ -184,6 +184,14 @@ var gitHubRunnerURL = 'https://github.com/${selfHostedConfig.?gitHubOrganization
 
 var devOpsOrgURL = 'https://dev.azure.com/${selfHostedConfig.?devOpsOrganization}'
 
+var acrPrivateDnsZoneResourceId = !empty(networkingConfiguration.?containerRegistryPrivateDnsZoneResourceId ?? '')
+  ? networkingConfiguration.?containerRegistryPrivateDnsZoneResourceId
+  : acrPrivateDNSZone.outputs.resourceId
+
+var deploymentScriptPrivateDNSZoneResourceId = !empty(networkingConfiguration.?deploymentScriptPrivateDnsZoneResourceId ?? '')
+  ? networkingConfiguration.?deploymentScriptPrivateDnsZoneResourceId
+  : deploymentScriptPrivateDNSZone.outputs.resourceId
+
 // ================ //
 // Resources        //
 // ================ //
@@ -207,7 +215,7 @@ resource avmTelemetry 'Microsoft.Resources/deployments@2023-07-01' = if (enableT
   }
 }
 
-module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0.11.1' = if (empty(logAnalyticsWorkspaceResourceId)) {
+module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0.11.1' = if (empty(logAnalyticsWorkspaceResourceId ?? '')) {
   name: 'logAnalyticsWokrspace'
   params: {
     name: 'law-${namingPrefix}-${uniqueString(resourceGroup().id)}-law'
@@ -233,6 +241,23 @@ module acrPrivateDNSZone 'br/public:avm/res/network/private-dns-zone:0.7.0' = if
           : networkingConfiguration.virtualNetworkResourceId
       }
     ]
+  }
+}
+
+// Extract subscriptionId and resourceGroupName from networkingConfiguration.?containerRegistryPrivateDnsZoneResourceId if not null or empty
+var containerRegistryPrivateDnsZoneSubscriptionId = !empty(networkingConfiguration.?containerRegistryPrivateDnsZoneResourceId ?? '')
+  ? split(split(networkingConfiguration.?containerRegistryPrivateDnsZoneResourceId, '/')[2], '/')[0]
+  : ''
+var containerRegistryPrivateDnsZoneResourceGroupName = !empty(networkingConfiguration.?containerRegistryPrivateDnsZoneResourceId ?? '')
+  ? split(split(networkingConfiguration.?containerRegistryPrivateDnsZoneResourceId, '/')[4], '/')[0]
+  : ''
+
+module privateDnsVnetLinkAcr 'modules/addPrivateDnsZoneVirtualNetworkLink.bicep' = if (networkingConfiguration.?addPrivateDnsZoneVirtualNetworkLink == true && !empty(networkingConfiguration.?containerRegistryPrivateDnsZoneResourceId ?? '')) {
+  name: 'privateDnsVnetLinkAcr'
+  scope: resourceGroup(containerRegistryPrivateDnsZoneSubscriptionId, containerRegistryPrivateDnsZoneResourceGroupName)
+  params: {
+    privateDnsZoneName: 'privatelink.azurecr.io'
+    virtualNetworkResourceId: newVnet.outputs.resourceId
   }
 }
 
@@ -269,16 +294,16 @@ module acr 'br/public:avm/res/container-registry/registry:0.9.1' = {
               : networkingConfiguration.networkType == 'useExisting'
                   ? '${networkingConfiguration.virtualNetworkResourceId}/subnets/${networkingConfiguration.containerRegistryPrivateEndpointSubnetName}'
                   : null
-            privateDnsZoneResourceIds: !empty(networkingConfiguration.?containerRegistryPrivateDnsZoneResourceId ?? '')
-              ? [
-                  networkingConfiguration.?containerRegistryPrivateDnsZoneResourceId ?? ''
-                ]
-              : [
-                  empty(networkingConfiguration.?containerRegistryPrivateDnsZoneResourceId ?? '')
-                    ? acrPrivateDNSZone.outputs.resourceId
-                    : ''
-                ]
-            privateDnsZoneGroupName: 'acrPrivateDNSZoneGroup'
+            privateDnsZoneGroup: (networkingConfiguration.?skipPrivateDnsZones == null || networkingConfiguration.?skipPrivateDnsZones != true)
+              ? {
+                  privateDnsZoneGroupConfigs: [
+                    {
+                      privateDnsZoneResourceId: acrPrivateDnsZoneResourceId
+                      name: 'acrPrivateDNSZoneGroup'
+                    }
+                  ]
+                }
+              : null
           }
         ]
       : null
@@ -320,14 +345,7 @@ module newVnet 'br/public:avm/res/network/virtual-network:0.5.4' = if (networkin
               natGatewayResourceId: empty(networkingConfiguration.?natGatewayResourceId ?? '') && privateNetworking
                 ? natGateway.outputs.resourceId
                 : networkingConfiguration.?natGatewayResourceId ?? ''
-              delegations: [
-                {
-                  name: 'Microsoft.ContainerInstance/containerGroups'
-                  properties: {
-                    serviceName: 'Microsoft.ContainerInstance/containerGroups'
-                  }
-                }
-              ]
+              delegation: 'Microsoft.ContainerInstance/containerGroups'
             }
           ]
         : [],
@@ -343,14 +361,7 @@ module newVnet 'br/public:avm/res/network/virtual-network:0.5.4' = if (networkin
               natGatewayResourceId: empty(networkingConfiguration.?natGatewayResourceId ?? '') && privateNetworking
                 ? natGateway.outputs.resourceId
                 : networkingConfiguration.?natGatewayResourceId ?? ''
-              delegations: [
-                {
-                  name: 'Microsoft.App.environments'
-                  properties: {
-                    serviceName: 'Microsoft.App/environments'
-                  }
-                }
-              ]
+              delegation: 'Microsoft.App/environments'
             }
           ]
         : [],
@@ -379,9 +390,9 @@ module appEnvironment 'br/public:avm/res/app/managed-environment:0.9.1' = if (co
   params: {
     name: 'appEnv${namingPrefix}${uniqueString(resourceGroup().id)}'
     // logAnalyticsWorkspaceResourceId: logAnalyticsWokrspace.outputs.resourceId
-    logAnalyticsWorkspaceResourceId: empty(logAnalyticsWorkspaceResourceId)
+    logAnalyticsWorkspaceResourceId: empty(logAnalyticsWorkspaceResourceId ?? '')
       ? logAnalyticsWorkspace.outputs.resourceId
-      : logAnalyticsWorkspaceResourceId
+      : (logAnalyticsWorkspaceResourceId ?? '')
     location: location
     infrastructureSubnetId: networkingConfiguration.networkType == 'createNew'
       ? filter(
@@ -538,7 +549,7 @@ module aciJob 'br/public:avm/res/container-instance/container-group:0.4.2' = [
             resources: {
               requests: {
                 cpu: selfHostedConfig.?cpu ?? 1
-                memoryInGB: selfHostedConfig.?memoryInGB ?? 2
+                memoryInGB: selfHostedConfig.?memoryInGB ?? '2'
               }
             }
             environmentVariables: selfHostedConfig.selfHostedType == 'github'
@@ -723,7 +734,7 @@ module acaPlaceholderJob 'br/public:avm/res/app/job:0.6.0' = if (contains(comput
 module deploymentScriptPrivateDNSZone 'br/public:avm/res/network/private-dns-zone:0.7.0' = if (contains(
   computeTypes,
   'azure-container-app'
-) && selfHostedConfig.selfHostedType == 'azuredevops' && privateNetworking && empty(networkingConfiguration.?computeNetworking.?deploymentScriptPrivateDnsZoneResourceId ?? '') && networkingConfiguration.?skipPrivateDnsZones != true) {
+) && selfHostedConfig.selfHostedType == 'azuredevops' && privateNetworking && empty(networkingConfiguration.?deploymentScriptPrivateDnsZoneResourceId ?? '') && networkingConfiguration.?skipPrivateDnsZones != true) {
   name: 'stgdsdnszone${namingPrefix}${uniqueString(resourceGroup().id)}'
   params: {
     name: 'privatelink.file.${environment().suffixes.storage}'
@@ -734,6 +745,23 @@ module deploymentScriptPrivateDNSZone 'br/public:avm/res/network/private-dns-zon
           : newVnet.outputs.resourceId
       }
     ]
+  }
+}
+
+// Extract subscriptionId and resourceGroupName from networkingConfiguration.?deploymentScriptPrivateDnsZoneResourceId if not null or empty
+var deploymentScriptPrivateDnsZoneSubscriptionId = !empty(networkingConfiguration.?deploymentScriptPrivateDnsZoneResourceId ?? '')
+  ? split(split(networkingConfiguration.?deploymentScriptPrivateDnsZoneResourceId, '/')[2], '/')[0]
+  : ''
+var deploymentScriptPrivateDnsZoneResourceGroupName = !empty(networkingConfiguration.?deploymentScriptPrivateDnsZoneResourceId ?? '')
+  ? split(split(networkingConfiguration.?deploymentScriptPrivateDnsZoneResourceId, '/')[4], '/')[0]
+  : ''
+
+module privateDnsVnetLinkFile 'modules/addPrivateDnsZoneVirtualNetworkLink.bicep' = if (networkingConfiguration.?addPrivateDnsZoneVirtualNetworkLink == true && !empty(networkingConfiguration.?deploymentScriptPrivateDnsZoneResourceId ?? '')) {
+  name: 'privateDnsVnetLinkFile'
+  scope: resourceGroup(deploymentScriptPrivateDnsZoneSubscriptionId, deploymentScriptPrivateDnsZoneResourceGroupName)
+  params: {
+    privateDnsZoneName: 'privatelink.file.${environment().suffixes.storage}'
+    virtualNetworkResourceId: newVnet.outputs.resourceId
   }
 }
 
@@ -769,11 +797,15 @@ module deploymentScriptStg 'br/public:avm/res/storage/storage-account:0.18.1' = 
                   networkingConfiguration.?containerAppDeploymentScriptSubnetName ?? 'snet-ada-deployment-script'
                 )
             )[0]
-        privateDnsZoneGroupName: networkingConfiguration.?skipPrivateDnsZones != true ? 'stgPrivateDNSZoneGroup' : null
-        privateDnsZoneResourceIds: networkingConfiguration.?skipPrivateDnsZones != true
-          ? [
-              networkingConfiguration.?computeNetworking.?deploymentScriptPrivateDnsZoneResourceId ?? deploymentScriptPrivateDNSZone.outputs.resourceId
-            ]
+        privateDnsZoneGroup: (networkingConfiguration.?skipPrivateDnsZones == null || networkingConfiguration.?skipPrivateDnsZones != true)
+          ? {
+              privateDnsZoneGroupConfigs: [
+                {
+                  privateDnsZoneResourceId: deploymentScriptPrivateDNSZoneResourceId
+                  name: networkingConfiguration.?skipPrivateDnsZones != true ? 'stgPrivateDNSZoneGroup' : null
+                }
+              ]
+            }
           : null
       }
     ]
@@ -793,7 +825,7 @@ module runPlaceHolderAgent 'br/public:avm/res/resources/deployment-script:0.5.1'
     retentionInterval: 'P1D'
     location: location
     managedIdentities: {
-      userAssignedResourcesIds: [
+      userAssignedResourceIds: [
         userAssignedIdentity.outputs.resourceId
       ]
     }
@@ -881,6 +913,9 @@ type newNetworkType = {
 
   @description('Optional. Should not deploy private DNS zones if existing resource IDs is missing in networkConfiguration')
   skipPrivateDnsZones: bool?
+
+  @description('Optional. Add private DNS zone virtual network link. Defaults to false to handle enterprise scenarios with centralized Private DNS zones.')
+  addPrivateDnsZoneVirtualNetworkLink: bool?
 }
 
 @export()
@@ -926,9 +961,6 @@ type containerAppNetworkConfigType = {
 
   @description('Required. The container instance subnet name in the created virtual network. If not provided, a default name will be used. This subnet is required for private networking Azure DevOps scenarios to deploy the deployment script which starts the placeholder agent privately.')
   containerInstanceSubnetName: string?
-
-  @description('Optional. Should not deploy private DNS zones if existing resource IDs is missing in networkConfiguration')
-  skipPrivateDnsZones: bool?
 }
 
 type containerInstanceNetworkConfigType = {
@@ -937,9 +969,6 @@ type containerInstanceNetworkConfigType = {
 
   @description('Required. The container instance subnet name in the created virtual network. If not provided, a default name will be used.')
   containerInstanceSubnetName: string
-
-  @description('Optional. Should not deploy private DNS zones if existing resource IDs is missing in networkConfiguration')
-  skipPrivateDnsZones: bool?
 }
 
 @export()
@@ -962,7 +991,7 @@ type azureContainerInstanceTargetType = {
   cpu: int?
 
   @description('Optional. The Azure Container Instance container memory.')
-  memoryInGB: int?
+  memoryInGB: string?
 
   @description('Optional. The Azure Container Instance container port.')
   port: int?

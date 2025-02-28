@@ -57,7 +57,7 @@ module testDeployment '../../../main.bicep' = {
       azureContainerInstanceTarget: {
         sku: 'Standard'
         cpu: 1
-        memoryInGB: 2
+        memoryInGB: '2'
         numberOfInstances: 3
       }
       selfHostedType: 'github'
