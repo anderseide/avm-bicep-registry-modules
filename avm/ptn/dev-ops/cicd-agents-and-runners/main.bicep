@@ -263,7 +263,7 @@ module acr 'br/public:avm/res/container-registry/registry:0.4.0' = {
                   subnetId =>
                     contains(
                       subnetId,
-                      networkingConfiguration.?containerRegistryPrivateEndpointSubnetName ?? 'acr-subnet'
+                      networkingConfiguration.?containerRegistryPrivateEndpointSubnetName ?? 'snet-acr'
                     )
                 )[0]
               : networkingConfiguration.networkType == 'useExisting'
@@ -296,8 +296,12 @@ module newVnet 'br/public:avm/res/network/virtual-network:0.2.0' = if (networkin
       privateNetworking
         ? [
             {
-              name: networkingConfiguration.?containerRegistryPrivateEndpointSubnetName ?? 'acr-subnet'
-              addressPrefix: networkingConfiguration.?containerRegistrySubnetPrefix ?? '10.0.0.32/29'
+              name: networkingConfiguration.?containerRegistryPrivateEndpointSubnetName ?? 'snet-acr'
+              addressPrefix: networkingConfiguration.?containerRegistrySubnetPrefix ?? cidrSubnet(
+                networkingConfiguration.addressSpace,
+                28,
+                0
+              ) // 10.0.0.0/28
             }
           ]
         : [],
@@ -307,8 +311,12 @@ module newVnet 'br/public:avm/res/network/virtual-network:0.2.0' = if (networkin
         ))
         ? [
             {
-              name: networkingConfiguration.?containerInstanceSubnetName ?? 'aci-subnet'
-              addressPrefix: networkingConfiguration.?containerInstanceSubnetAddressPrefix ?? '10.0.2.0/24'
+              name: networkingConfiguration.?containerInstanceSubnetName ?? 'snet-aci'
+              addressPrefix: networkingConfiguration.?containerInstanceSubnetAddressPrefix ?? cidrSubnet(
+                networkingConfiguration.addressSpace,
+                28,
+                1
+              ) // 10.0.0.16/28
               natGatewayResourceId: empty(networkingConfiguration.?natGatewayResourceId ?? '') && privateNetworking
                 ? natGateway.outputs.resourceId
                 : networkingConfiguration.?natGatewayResourceId ?? ''
@@ -326,8 +334,12 @@ module newVnet 'br/public:avm/res/network/virtual-network:0.2.0' = if (networkin
       contains(computeTypes, 'azure-container-app')
         ? [
             {
-              name: networkingConfiguration.?containerAppSubnetName ?? 'app-subnet'
-              addressPrefix: networkingConfiguration.?containerAppSubnetAddressPrefix ?? '10.0.1.0/24'
+              name: networkingConfiguration.?containerAppSubnetName ?? 'snet-ada'
+              addressPrefix: networkingConfiguration.?containerAppSubnetAddressPrefix ?? cidrSubnet(
+                networkingConfiguration.addressSpace,
+                27,
+                2
+              ) // 10.0.0.32/27
               natGatewayResourceId: empty(networkingConfiguration.?natGatewayResourceId ?? '') && privateNetworking
                 ? natGateway.outputs.resourceId
                 : networkingConfiguration.?natGatewayResourceId ?? ''
@@ -345,8 +357,12 @@ module newVnet 'br/public:avm/res/network/virtual-network:0.2.0' = if (networkin
       contains(computeTypes, 'azure-container-app') && privateNetworking && selfHostedConfig.selfHostedType == 'azuredevops'
         ? [
             {
-              name: networkingConfiguration.?containerAppDeploymentScriptSubnetName ?? 'app-deployment-script-subnet'
-              addressPrefix: networkingConfiguration.?containerAppDeploymentScriptSubnetPrefix ?? '10.0.3.0/29'
+              name: networkingConfiguration.?containerAppDeploymentScriptSubnetName ?? 'snet-ada-deployment-script'
+              addressPrefix: networkingConfiguration.?containerAppDeploymentScriptSubnetPrefix ?? cidrSubnet(
+                networkingConfiguration.addressSpace,
+                27,
+                3
+              ) // 10.0.0.64/27
             }
           ]
         : [],
@@ -370,7 +386,7 @@ module appEnvironment 'br/public:avm/res/app/managed-environment:0.6.2' = if (co
     infrastructureSubnetId: networkingConfiguration.networkType == 'createNew'
       ? filter(
           newVnet.outputs.subnetResourceIds,
-          subnetId => contains(subnetId, networkingConfiguration.?containerAppSubnetName ?? 'app-subnet')
+          subnetId => contains(subnetId, networkingConfiguration.?containerAppSubnetName ?? 'snet-ada')
         )[0]
       : networkingConfiguration.networkType == 'useExisting'
           ? '${networkingConfiguration.virtualNetworkResourceId}/subnets/${networkingConfiguration.computeNetworking.containerAppSubnetName}'
@@ -497,7 +513,7 @@ module aciJob 'br/public:avm/res/container-instance/container-group:0.2.0' = [
       subnetId: privateNetworking && networkingConfiguration.networkType == 'createNew'
         ? filter(
             newVnet.outputs.subnetResourceIds,
-            subnetId => contains(subnetId, networkingConfiguration.?containerInstanceSubnetName ?? 'aci-subnet')
+            subnetId => contains(subnetId, networkingConfiguration.?containerInstanceSubnetName ?? 'snet-aci')
           )[0]
         : privateNetworking && networkingConfiguration.networkType == 'useExisting'
             ? '${networkingConfiguration.virtualNetworkResourceId}/subnets/${networkingConfiguration.computeNetworking.containerInstanceSubnetName}'
@@ -750,7 +766,7 @@ module deploymentScriptStg 'br/public:avm/res/storage/storage-account:0.13.0' = 
               subnetId =>
                 contains(
                   subnetId,
-                  networkingConfiguration.?containerAppDeploymentScriptSubnetName ?? 'app-deployment-script-subnet'
+                  networkingConfiguration.?containerAppDeploymentScriptSubnetName ?? 'snet-ada-deployment-script'
                 )
             )[0]
         privateDnsZoneGroupName: 'stgPrivateDNSZoneGroup'
@@ -784,7 +800,7 @@ module runPlaceHolderAgent 'br/public:avm/res/resources/deployment-script:0.3.1'
       ? [
           filter(
             newVnet.outputs.subnetResourceIds,
-            subnetId => contains(subnetId, networkingConfiguration.?containerInstanceSubnetName ?? 'aci-subnet')
+            subnetId => contains(subnetId, networkingConfiguration.?containerInstanceSubnetName ?? 'snet-aci')
           )[0]
         ]
       : privateNetworking && networkingConfiguration.networkType == 'useExisting'
