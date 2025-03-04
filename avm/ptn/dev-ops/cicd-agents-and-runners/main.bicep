@@ -1015,7 +1015,7 @@ type gitHubRunnersType = {
   @description('Required. The GitHub organization name.')
   githubOrganization: string
 
-  @description('Required. The GitHub repository name.')
+  @description('Optional. The GitHub repository name.')
   githubRepository: string?
 
   @description('Optional. The GitHub runner name.')
